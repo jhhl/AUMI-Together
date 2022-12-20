@@ -1,0 +1,30 @@
+{
+"version":"1.0",
+"name":"Kitchen",
+"sounds":
+[
+"Ceramic Bowl 01.mp3",
+"Ceramic Bowl 03.mp3",
+"Frying Pan 02.mp3",
+"Frying Pan 05.mp3",
+"Frying Pan 10.mp3",
+"Metal Bowl 02.mp3",
+"Metal Bowl Small 02.mp3",
+"Metal Tray 01.mp3",
+"Metal Tray 02.mp3",
+"Metal Tray 03.mp3",
+"Plastic Jug 01.mp3",
+"Plastic Jug 02.mp3",
+"Plastic Yogurt Container 03.mp3",
+"Plastic Yogurt Container 06.mp3",
+"Pot 01.mp3",
+"Pot 02.mp3",
+"Pot 05.mp3",
+"Skillet 01.mp3",
+"Skillet 05.mp3",
+"Skillet 09.mp3",
+"Skillet Lid 01.mp3",
+"Skillet Lid 04.mp3",
+"Trash Can 03.mp3"
+]
+}

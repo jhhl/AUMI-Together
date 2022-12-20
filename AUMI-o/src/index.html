@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=UTF-8 />
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+  </head>
+  <body>
+    
+    <div>
+      <video id="video" width="800" src="video2.mp4" autoplay muted loop></video>
+      <canvas id="output-canvas" width="800" height="450" ></canvas>
+    </div>
+
+    <script>
+      let video,video2,c1,ctx1,c_tmp,ctx_tmp; 
+      function init() {
+        video = document.getElementById('video');
+
+        video2 = document.createElement('video');
+        video2.src = "fire.mp4"
+        video2.muted = true;
+        video2.autoplay = true;
+
+        c1 = document.getElementById('output-canvas');
+        ctx1 = c1.getContext('2d');
+
+        c_tmp = document.createElement('canvas');
+        c_tmp.setAttribute('width', 800);
+        c_tmp.setAttribute('height', 450);
+        ctx_tmp = c_tmp.getContext('2d');
+
+        video.addEventListener('play', computeFrame );
+      }
+   function computeFrame() {
+
+    if (video.paused || video.ended) {
+      return;
+    }
+    ctx_tmp.drawImage(video, 0, 0, video.videoWidth , video.videoHeight );
+    let frame = ctx_tmp.getImageData(0, 0, video.videoWidth , video.videoHeight );
+
+    ctx_tmp.drawImage(video2, 0, 0, video2.videoWidth , video2.videoHeight );
+    let frame2 = ctx_tmp.getImageData(0, 0, video2.videoWidth , video2.videoHeight );
+
+    for (let i = 0; i < frame.data.length /4; i++) {
+      let r = frame.data[i * 4 + 0];
+      let g = frame.data[i * 4 + 1];
+      let b = frame.data[i * 4 + 2];
+
+      if (r > 70 && r < 160 && g > 95 && g < 220 && b > 25 && b < 150) 
+      {  
+          frame.data[i * 4 + 0] = frame2.data[i * 4 + 0];
+          frame.data[i * 4 + 1] = frame2.data[i * 4 + 1];
+          frame.data[i * 4 + 2] = frame2.data[i * 4 + 2];
+      }
+    }
+    ctx1.putImageData(frame, 0, 0);
+    setTimeout(computeFrame, 0);
+  }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      init();
+    });
+    </script>
+  </body>
+</html>

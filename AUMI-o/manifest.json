@@ -1,0 +1,40 @@
+{
+    "background_color": "#3E4EB8",
+    "display": "standalone",
+    "icons": [
+        {
+            "sizes": "48x48",
+            "src": "Icons/AUMI%20Icon-48.png",
+            "type": "image/png"
+        },
+        {
+            "sizes": "72x72",
+            "src": "Icons/AUMI%20Icon-72.png",
+            "type": "image/png"
+        },
+        {
+            "sizes": "96x96",
+            "src": "Icons/AUMI%20Icon-96.png",
+            "type": "image/png"
+        },
+        {
+            "sizes": "144x144",
+            "src": "Icons/AUMI%20Icon-144.png",
+            "type": "image/png"
+        },
+        {
+            "sizes": "192x192",
+            "src": "Icons/AUMI%20Icon-192.png",
+            "type": "image/png"
+        },
+        {
+            "sizes": "512x512",
+            "src": "Icons/AUMI%20Icon-512.png",
+            "type": "image/png"
+        }
+    ],
+    "name": "AUMI Webapp",
+    "short_name": "AUMI Webapp",
+    "start_url": "index.html",
+    "theme_color": "#2F3BA2"
+}

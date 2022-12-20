@@ -1,0 +1,1063 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="manifest" content="manifest.json" />
+<title>AUMI/WebApp</title>
+<style type="text/cs">
+
+
+</style>
+<style type="text/css">@import "switch.css";</style>
+<style type="text/css">@import "aumiwebapp.css";</style>
+<script src="JS/jhhlquery.js"></script>
+<script src="JS/howler.js"></script>
+<script src="JS/JZZ.js"></script>
+<script src="JS/webapp-helpers.js"></script>
+<script src="JS/detect.min.js"></script>
+
+<script>
+//from https://developers.google.com/web/tools/workbox/guides/get-started
+// Check that service workers are supported
+if ('serviceWorker' in navigator) {
+  // Use the window load event to keep the page load performant
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('JS/service-worker.js');
+  });
+}
+</script>
+
+<script>
+
+
+var getJSON = function(url, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'json';
+    xhr.onload = function() {
+      var status = xhr.status;
+      if (status === 200) {
+        callback(null, xhr.response);
+      } else {
+        callback(status, xhr.response);
+      }
+    };
+    xhr.send();
+};
+
+// might need these in a gestalt object
+let thisDetectedAgent = detect.parse(navigator.userAgent).browser.name;
+var isChrome = thisDetectedAgent.includes('Chrome');
+var isSafari = thisDetectedAgent.includes('Safari');
+var isFirefox = thisDetectedAgent.includes('Firefox');
+var isMS = thisDetectedAgent.includes('Explorer');
+var isMS = isMS || thisDetectedAgent.includes('Edge');
+
+// supposedly these is the video dimensions, but they are not being reported???
+// this s what we generally want.
+var DWidth = 640;
+var DHeight = 480;
+
+var CWidth = 640;
+var CHeight = 480;
+
+var showRgb4Colors = false;
+var showColorSet = false;
+var removeFromMap = false;
+var t_mirror = true;
+var t_rotation = 0;
+var letterbox = true;
+
+
+// debuggery
+var cmapX=0;
+var cmapY=0 ;
+
+//- - - - - - - On Load - - - - -
+
+function loadActions(t)
+{
+	// general initialization do I have to say global like python does
+	 showRgb4Colors = false;
+	 showColorSet = false;
+	 removeFromMap = false;
+	 t_mirror = true;
+	 t_rotation = 0;
+	 letterbox = true;
+// test reading json from urls!
+buildInstrumentsList();
+buildInstrumentSelector();
+
+//let soundURL="Instruments/Toy%20Piano";
+//readAndBuildInstrument(soundURL);
+useInstrumentN();
+
+// MIDI support? not yet! that's part of the Instruments  module
+//setupMIDI();
+
+
+// setupColorTracking Tables and stuff
+// make sure video isn't built yet!
+setupColorTracking();
+
+// Get access to the camera!
+const constraints = { video: true, audio:false};
+if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia(constraints)) {
+	// enumerate 'em
+	navigator.mediaDevices.enumerateDevices()
+  .then(getDevices) ;
+}
+else
+{
+	alert("No cameras found! (Run this as https:?)");
+}
+
+// Elements for processing video
+var canvas = $('canvas');
+var context = canvas.getContext('2d');
+var layer1 = $('layer1');
+var contextl = layer1.getContext('2d');
+
+var video = $('video');
+
+clearCanvas();
+
+// for color selection
+  canvas.addEventListener('mousedown', startColorCollect );
+  canvas.addEventListener('mousemove', moveColorCollect );
+  canvas.addEventListener('mouseup', endColorCollect );
+  // this may be on top!
+  layer1.addEventListener('mousedown', startColorCollect );
+  layer1.addEventListener('mousemove', moveColorCollect );
+  layer1.addEventListener('mouseup', endColorCollect );
+
+  // synch with t_mirror
+  $('mirror_check').checked = t_mirror;
+  // just make sure it's synched.
+  enMirror();
+}
+
+function videoToggle(elem)
+{
+
+
+}
+//  now called from the device select.
+
+function useVideoDevice(button)
+{
+	selectEl = $('videoSelect');
+// only use one option, the first
+  let selVid = selectEl.selectedOptions[0];
+    myPreferredCameraDeviceId = selVid.value;
+    	// turn it off if it was on
+    	if(video.srcObject != null)
+    	{
+	       	if(video.srcObject.getVideoTracks()[0].readyState=='live')
+	    	{
+	    		turnVideoStreamOff();
+	    	}
+    	};
+    if(myPreferredCameraDeviceId == 'Off')
+    {
+    }
+    else
+    {
+    	// facingmode is 'user' or 'environment'!
+    	// I'd like to know if any of those other cameras show up in the video list!
+    	var constraints = {
+    		video: {
+    		  deviceId: myPreferredCameraDeviceId,
+    			 width: DWidth,
+   				height: DHeight,
+   			facingmode: 'user'
+    		}
+    	};
+
+	    navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+	        //video.src = window.URL.createObjectURL(stream);
+	        video.srcObject = stream;
+	        video.pause();
+	        // get the video metrics
+	         CHeight =  video.clientHeight , // get the screen size to make canvas adaptive
+             CWidth = video.clientWidth;
+	        // continuous montoring
+	 		video.addEventListener('play', videoTrack );
+	 		//start it back up
+	 		video.play();
+	    }).catch(function(err) {
+  /* handle the error */
+		alert("cannot access that camera");
+		});
+    };
+}
+
+
+
+
+function toggleRgb4Colors(elem)
+{
+	showRgb4Colors = elem.checked;
+}
+
+function toggleShowColorSet(elem)
+{
+	showColorSet = elem.checked;
+}
+
+function toggleRemoveFromMapSet(elem)
+{
+	removeFromMap = elem.checked;
+}
+// you have to blast all the transforms in on transform
+function transformCss(kind)
+{
+	var tout1 = 'transform: ';
+	// change this in case it needto be changed per browser
+	return tout1+kind+';';
+}
+// there are 8 oreientations:
+//        Direct            Mirror  t_mirror(TF)
+// 0
+// 90
+// 180
+// 270
+// rotation
+function enMirror()
+{
+	// affine-ulate the canvas
+	// rotation, mirroring, letterboxing
+	//
+	var tstyle = "position:absolute;left:0px;top:0px;";
+	// break down other rotations here
+	var tform='';
+
+	// rotation may be undefined? why!!!
+	if(t_rotation > 0 )
+	{
+		let rdeg = t_rotation+'deg';
+		// 	rotate(angle)
+		tform+=' rotate('+rdeg+')';
+	}
+	if(t_mirror)
+	{
+		tform+=' scale(-1,1)';
+	}
+	// put in the transform...
+	tstyle+=transformCss(tform);
+
+	//two levels
+	let canvasCss = "z-index: 1;"+tstyle;;
+	let layer1Css = "z-index: 10;"+tstyle;
+
+	canvas.style.cssText = canvasCss;
+	layer1.style.cssText = layer1Css;
+}
+
+function toggleMirror(elem)
+{
+	t_mirror = elem.checked;
+	enMirror();
+}
+
+function changeRotation(elem)
+{
+	t_rotation = parseInt(elem.options[elem.selectedIndex].value);
+	enMirror();
+}
+
+function clearCanvas()
+{
+	// I guess context changes a lot.
+	let context = canvas.getContext('2d');
+	context.fillStyle = '#e8f8e0';
+	context.fillRect(0,0,canvas.width,canvas.height);
+	let contextl = layer1.getContext('2d');
+	contextl.clearRect(0,0,canvas.width,canvas.height);
+}
+
+function turnVideoStreamOff()
+{
+    video.pause();
+    video.src = "";
+    video.srcObject.getVideoTracks()[0].stop();
+    clearCanvas();
+}
+
+ // refresh the video device list.
+function getDevices(deviceInfos) {
+
+ videoSelect = $('videoSelect');
+
+ var offOption = document.createElement('option');
+ offOption.value='Off';
+ offOption.text='Off';
+ videoSelect.appendChild(offOption);
+
+  for (var i = 0; i !== deviceInfos.length; ++i) {
+    var deviceInfo = deviceInfos[i];
+
+   if (deviceInfo.kind === 'videoinput') {
+   	// here's where I bet we can pick up the actual dimensions?
+
+    var option = document.createElement('option');
+    option.value = deviceInfo.deviceId;
+    // we aren't counting "off" as a device... so start counting with '1'
+      option.text = deviceInfo.label || 'Camera '+(videoSelect.length);
+      videoSelect.appendChild(option);
+    }
+  }
+  // load up first camera which is off?
+videoSelect.selectedIndex = "0";
+videoSelect.addEventListener('change', useVideoDevice);
+useVideoDevice();
+
+}
+
+// I suspect the video is bigger than 640x480
+
+var floodArray = Array();
+floodArray[640*480] = 0; // preallocate it
+
+function videoTrack() {
+
+    if (video.paused || video.ended) {
+      return;
+    }
+
+     // is this permanent? can I make this global?
+    let context = canvas.getContext('2d');
+    // a hint because we do get image data a lot.
+    context.willReadFrequently = true;
+
+    context.drawImage(video, 0, 0, 640, 480);
+     // we should be able to read the data out of the canvas context.
+    var frame = context.getImageData(0, 0, context.canvas.width , context.canvas.height );
+
+    let contextl = layer1.getContext('2d');
+    contextl.willReadFrequently = true;
+
+    contextl.clearRect(0,0,640,480);
+     // we should be able to read the data out of the canvasl context.
+    var layerFrame = contextl.getImageData(0, 0, contextl.canvas.width , contextl.canvas.height );
+
+	// clear the Flood Array?
+	floodArray.splice(0, floodArray.length);
+    colorTrack(frame,layerFrame,floodArray);
+
+	drawSoundBoxes(layerFrame);
+	drawCursorBox(layerFrame);
+    context.putImageData(frame,0,0)
+    contextl.putImageData(layerFrame,0,0)
+    // this draws it into layer1 afer the bitmap is transferred.
+    drawCursor();
+// play now that we know where the cursor is?
+playIfBoxHit(curx,cury,curx,cury); // will be last x,y later
+
+  // make this as fast as possible, running not on data availabilty, but a stupid ass timer? grrr.
+  // how about 10 fps? 20?
+    setTimeout(videoTrack, 50);
+  }
+
+var map8to4;
+var map4to8;
+
+function buildRGBMapTables()
+{
+map8to4 = Array();
+map4to8 = Array();
+var last4 = 9999999;
+for(let i=0;i<256;i++)
+{
+	let fc = i/256.0;
+	let magic = 18.9
+	let c4= Math.max(0,Math.min(15,Math.round((1.0-Math.pow(1.0-fc,0.33333))*magic)))
+    map8to4.push(c4);
+    if(c4 != last4)
+    {
+    	map4to8.push(i);
+    	last4 = c4; //  the ios version uses the proportional value from the span, so 0 is 0, fff is fff
+    }
+}
+}
+
+function setupColorTracking()
+{
+	createRgbMap();
+}
+
+var rgbMap;
+function createRgbMap()
+{
+rgbMap= Array();
+rgbMap[0] = 0;
+rgbMap[4095] = 0;
+buildRGBMapTables();
+}
+
+function clearRgbMap()
+{
+	for(let i = 0 ; i<4096;i++)
+	{
+		rgbMap[i]=0;
+	}
+}
+
+
+function colorTrack(frame,layerFrame,floodArray)
+{
+ if(showColorSet)
+  {
+  	// layerframe should already be clear, really.
+  }
+
+  BBT=480;
+  BBB=0;
+  BBL=640;
+  BBR=0;
+
+
+// frame is in bytes, not Video_8888's
+
+for(let i=0;i<frame.data.length/4; i++)
+{
+  let vy = Math.floor(i/640);
+  let vx = i-(vy*640);
+  let i4 = i*4;
+
+  let r = frame.data[i4+ 0];
+  let g = frame.data[i4+ 1];
+  let b = frame.data[i4+ 2];
+
+  // make it into 444 color
+  let c4r = map8to4[r];
+  let c4g = map8to4[g];
+  let c4b = map8to4[b];
+
+
+// should this be in the frame layer?
+ if(showRgb4Colors)
+  {	// hokey color zap
+	let c8r = map4to8[c4r];
+	let c8g = map4to8[c4g];
+	let c8b = map4to8[c4b];
+	frame.data[i4+ 0] = c8r;
+	frame.data[i4+ 1] = c8g;
+	frame.data[i4+ 2] = c8b;
+  }
+
+  // look it up in the bit map
+  let rgbIx = c4r*256+c4g*16+c4b;
+ 	if(rgbMap[rgbIx]==1)
+	{
+		floodArray[i] = 1;
+		// boundbox for presumed single area
+		BBT=Math.min(vy,BBT);
+		BBB=Math.max(vy,BBB);
+		BBL=Math.min(vx,BBL);
+		BBR=Math.max(vx,BBR);
+
+		if(showColorSet)
+		{
+			// this can now be any color because it's not zapping the data.
+			let MAX = Math.max(r,Math.max(g,b));
+			if(MAX<128)
+			{
+				layerFrame.data[i4+ 0] = 128+(r)/2;
+				layerFrame.data[i4+ 1] = 128+(g)/2;
+				layerFrame.data[i4+ 2] = 128+(b)/2;
+				layerFrame.data[i4+ 3] = 255; // hmm is alpha obeyed?
+			}
+			else
+			{
+				layerFrame.data[i4+ 0] = (r)/2;
+				layerFrame.data[i4+ 1] = (g)/2;
+				layerFrame.data[i4+ 2] = (b)/2;
+				layerFrame.data[i4+ 3] = 255; // hmm is alpha obeyed?
+
+			}
+
+		}
+	}
+	// these are global?!
+   	  curx = Math.floor((BBL+BBR)/2.0);
+	  cury = Math.floor((BBT+BBB)/2.0);
+}
+}
+
+
+
+// collecting colors
+// ideally, this woud be not from Canvas, but Video. can we do that??
+// either that, or we need a layer on top of canvas for "metadata" like the sound areas and cursor
+function canvasColorIx4(elem)
+{
+	cmapX = elem.layerX;
+	cmapY = elem.layerY;
+
+	let context = canvas.getContext('2d');
+	let frame = context.getImageData(0, 0, context.canvas.width , context.canvas.height );
+	var bMirror = t_mirror;
+	if(isFirefox)
+	{
+		bMirror = false;
+	}
+	let frIx =  bMirror?((cmapY*context.canvas.width) + (context.canvas.width-cmapX)):((cmapY*context.canvas.width) + cmapX);
+
+	let r = frame.data[frIx * 4 + 0];
+	let g = frame.data[frIx * 4 + 1];
+	let b = frame.data[frIx * 4 + 2];
+
+	let c4r = map8to4[r];
+	let c4g = map8to4[g];
+	let c4b = map8to4[b];
+
+	let minc = Math.min(c4r,Math.min(c4g,c4b));
+	let maxc = Math.max(c4r,Math.max(c4g,c4b));
+	if(minc == maxc)
+		return 0;
+	if(maxc ==0)
+		return 0;
+	// look it up in the bit map
+	let rgbIx = c4r*256+c4g*16+c4b;
+	return rgbIx;
+}
+
+var collectingColors = false;
+// debug function
+function showCMapXY(frame)
+{
+	let context = canvas.getContext('2d');
+
+	// debug
+	for(let i = 0;i<context.canvas.width;i++)
+	{
+			let frIx = context.canvas.width * cmapY + i;
+
+	 frame.data[frIx * 4 + 0] = 255;
+	 frame.data[frIx * 4 + 1] = 128;
+	 frame.data[frIx * 4 + 2] = 64;
+	}
+  	for(let i = 0;i<context.canvas.height;i++)
+	{
+			let frIx = context.canvas.width * i + cmapX;
+
+	 frame.data[frIx * 4 + 0] = 255;
+	 frame.data[frIx * 4 + 1] = 128;
+	 frame.data[frIx * 4 + 2] = 64;
+	}
+}
+
+// -- drawing
+// curx , cury set as soon as BBox is determined
+function drawCursorBox(lFrame)
+{
+
+	// bbox
+	//top + bot
+	var frIx=0;
+
+	for(let i = BBL;i<BBR;i++)
+	{
+		// dashed line
+		if((i>>3) %2 ==0)
+		{
+			continue;
+		}
+	 frIx = (lFrame.width * BBT + i)*4;
+	 lFrame.data[frIx  + 0] = 0;
+	 lFrame.data[frIx+ 1] = 0;
+	 lFrame.data[frIx  + 2] = 0;
+	 lFrame.data[frIx  + 3] = 255;
+
+	frIx = (lFrame.width * BBB + i)*4;
+	 lFrame.data[frIx  + 0] = 0;
+	 lFrame.data[frIx  + 1] = 0;
+	 lFrame.data[frIx + 2] = 0;
+	 lFrame.data[frIx+ 3] = 255;
+	}
+	//l+r
+	for(let i = BBT;i<BBB;i++)	{
+		if((i>>3) %2 ==0)
+		{
+			continue;
+		}
+	 frIx = (lFrame.width * i + BBL)*4;
+	 lFrame.data[frIx  + 0] = 0;
+	 lFrame.data[frIx  + 1] = 0;
+	 lFrame.data[frIx + 2] = 0;
+	 lFrame.data[frIx + 3] = 255;
+
+	 frIx = (lFrame.width * i + BBR)*4;
+	 lFrame.data[frIx  + 0] = 0;
+	 lFrame.data[frIx + 1] = 0;
+	 lFrame.data[frIx + 2] = 0;
+	 lFrame.data[frIx + 3] = 255;
+	}
+
+ // 128x102 is cursor radio-t@2x.png
+// 	let curx = Math.floor((BBL+BBR)/2.0);
+//	let cury = Math.floor((BBT+BBB)/2.0);
+ 	let contextl = layer1.getContext('2d');
+  	var img = document.getElementById("cursor");
+  	contextl.drawImage(img,curx,cury, 64, 51);
+}
+
+
+function drawCursor()
+{
+	// if there's no left/right, there's no cursor!
+	if(BBL<BBR)
+	{
+		// 128x102 is cursor radio-t@2x.png
+//		let curx = Math.floor((BBL+BBR)/2.0);
+//		let cury = Math.floor((BBT+BBB)/2.0);
+		let contextl = layer1.getContext('2d');
+		var img = document.getElementById("cursor");
+		// half size, roughly
+		contextl.drawImage(img,curx-32,cury-25, 64, 50);
+	}
+ }
+
+ // lets make em  yellow
+function drawSoundBoxes(lFrame)
+{
+
+	var frIx=0;
+
+	for(const sBox of soundBoxes)
+	{
+		let sL = sBox.l;
+		let sR = sBox.r;
+		let sT = sBox.t;
+		let sB = sBox.b;
+
+		for(let i = sL;i<sR;i++)
+		{
+		 frIx = (lFrame.width * sT + i)*4;
+		 lFrame.data[frIx + 0] = 255;
+		 lFrame.data[frIx+ 1] = 255;
+		 lFrame.data[frIx + 2] = 0;
+		 lFrame.data[frIx + 3] = 255;
+
+		frIx = (lFrame.width * sB + i)*4;
+		 lFrame.data[frIx  + 0] = 255;
+		 lFrame.data[frIx + 1] = 255;
+		 lFrame.data[frIx + 2] = 0;
+		 lFrame.data[frIx  + 3] = 255;
+		}
+		//l+r
+		for(let i = sT;i<sB;i++)	{
+		 frIx = (lFrame.width * i + sL)*4;
+		 lFrame.data[frIx + 0] = 255;
+		 lFrame.data[frIx+ 1] = 255;
+		 lFrame.data[frIx  + 2] = 0;
+		 lFrame.data[frIx + 3] = 255;
+
+		 frIx = (lFrame.width * i + sR) * 4;
+		 lFrame.data[frIx  + 0] = 255;
+		 lFrame.data[frIx + 1] = 255;
+		 lFrame.data[frIx  + 2] = 0;
+		 lFrame.data[frIx  + 3] = 255;
+		}
+	} // each sound
+}
+
+// enroll in rgbmap
+
+function startColorCollect(elem)
+{
+$('aumiStatus').innerHTML="gathering colors";
+
+	if(!removeFromMap)
+	{
+		clearRgbMap();
+	}
+   let rgbIx = canvasColorIx4(elem);
+   if(removeFromMap)
+   {
+   	rgbMap[rgbIx]= 0;
+   }
+   else
+   {
+   if(rgbIx>0)
+   {
+	rgbMap[rgbIx]= 1;
+   }
+   }
+   	collectingColors = true;
+
+}
+
+function  moveColorCollect(elem)
+{
+	if(collectingColors)
+	{
+	   let rgbIx = canvasColorIx4(elem);
+	  if(removeFromMap)
+	   {
+	   	rgbMap[rgbIx]= 0;
+	   }
+	   else
+	   {
+	   if(rgbIx>0)
+	   {
+		rgbMap[rgbIx]= 1;
+	   }
+	   }
+	}
+}
+
+function endColorCollect(elem)
+{
+	if(collectingColors)
+	{
+	$('aumiStatus').innerHTML="Map:"+rgbMapStringNice();
+
+	   let rgbIx = canvasColorIx4(elem);
+	  if(removeFromMap)
+	   {
+	   	rgbMap[rgbIx]= 0;
+	   }
+	   else
+	   {
+	   if(rgbIx>0)
+	   {
+		rgbMap[rgbIx]= 1;
+	   }
+	   }
+	   	collectingColors = false;
+
+	}
+}
+
+function rgbMapString()
+{
+ var sb = "";
+ let hexes = "0123456789ABCDEF";
+ for(let i = 0 ; i<4096;i++)
+ {
+ 	if(rgbMap[i])
+ 	{
+ 		sb+=hexes[(i&0x0f00)>>8];
+ 		sb+=hexes[(i&0x00f0)>>4];
+ 		sb+=hexes[(i&0x000f)];
+ 	}
+ }
+ return sb;
+}
+
+function rgbMapStringNice()
+{
+ var sb = "";
+ let hexes = "0123456789ABCDEF";
+ for(let i = 0 ; i<4096;i++)
+ {
+ 	if(rgbMap[i])
+ 	{
+ 		sb+=hexes[(i&0x0f00)>>8];
+ 		sb+=hexes[(i&0x00f0)>>4];
+ 		sb+=hexes[(i&0x000f)];
+ 		sb+=' ';
+ 	}
+ }
+ return sb;
+}
+
+var aumi_instruments = [];
+var sounds=[];
+var soundBoxes=[];
+var layoutType='horiz';
+var l_t,l_b,l_l,l_r;
+
+var currentInstrumentName;
+var lastBoxPlayed;
+
+function Sound(soundFileName,url)
+{
+	this.soundFileURL = url+"/"+soundFileName;
+	this.soundId = soundFileName.substr(0, soundFileName.lastIndexOf('.'));
+
+	this.howlSound = new Howl({"src":[this.soundFileURL]});
+
+	this.play = function(x,y) {
+		// try howler now
+		this.howlSound.play();
+	};
+}
+
+
+function SoundBox(l,r,t,b,sound)
+{
+	this.t = Math.floor(t+0.5);
+	this.b = Math.floor(b+0.5);
+	this.l = Math.floor(l+0.5);
+	this.r = Math.floor(r+0.5);
+	this.sound = sound;
+
+	this.inBox = function(x,y) {
+    return ((x>=l) && (x<=r) &&(y>=t) &&(y<=b));
+};
+}
+
+// MIDI  overview
+var JZZ;
+var MIDIOutput;
+
+function setupMIDI()
+{
+   MIDIOutput = JZZ().or('Cannot start MIDI engine!').openMidiOut().or('Cannot open MIDI Out port!');
+}
+function midiNON(nn,vel)
+{
+	MIDIOutput.send([0x90,nn,vel]);
+}
+function midiNOFF(nn,vel)
+{
+	MIDIOutput.send([0x80,nn,vel]);
+}
+
+ // audio stuff
+ // [sounds] -> [ordered sounds] -> [laid out soundBoxes]
+ // reads AUMIInsts
+ // sounds is array of Sound objects
+
+
+ // could use the file interface, but urls are better ...?
+  function buildInstrumentsList()
+  {
+  	// URLS bases for instruments.
+  	// should come from the sounds module
+    // that should be a manifest of sound collections and generators
+  	aumi_instruments=[
+      ["Toy Piano","Instruments/Toy%20Piano"],
+      ["Kitchen","Instruments/Kitchen"]
+  	];
+  }
+  function buildInstrumentSelector()
+  {
+    instSelect = $('instrumentSelect');
+     for (var i = 0; i < aumi_instruments.length; ++i) {
+       var option = document.createElement('option');
+       option.value = i; // value is the index of the record
+       // we aren't counting "off" as a device... so start counting with '1'
+         option.text = aumi_instruments[i][0];
+         instSelect.appendChild(option);
+     }
+     // load up first camera which is off?
+   instSelect.selectedIndex = "0";
+   instSelect.addEventListener('change', useInstrumentN);
+   // useVideoDevice();
+  }
+
+  // gets N itself...
+  function useInstrumentN()
+  {
+    let iSelector = $('instrumentSelect');
+    let selectInstIx  =iSelector.selectedIndex;
+  	let URL =aumi_instruments[selectInstIx][1];
+  	// setupAudio(URL);
+    readAndBuildInstrument(URL);
+  }
+
+function readAndBuildInstrument(url)
+{
+// when done,this has a sounds object
+// eventually: use a real AUMI Inst manifest
+// aka the metadata.json
+	getJSON(url+"/aumi-manifest.json",
+	function(err, data) {
+	if (err !== null) {
+	  alert('AUMI Instrument Manifest Reading went wrong: ' + err);
+	} else {
+	  // set it up!
+	  if(data.version == "1.0")
+	  {
+	  	// overrides the preset one, but should be identical.
+	  	currentInstrumentName  = data.name;
+
+	  	// now we need to read each sound
+	  	for(const soundFileName of data.sounds)
+	  	{
+	  		sObj = new Sound(soundFileName,url);
+			sounds.push(sObj);
+	  	} // sounds built
+ 	  	// this will have a parameter that governs the layout
+			layoutSoundBoxes();
+
+	  }
+	}
+	});
+}
+
+ // function setupAudio(soundURL)
+ // {
+ // 	// this is a top-level url to an instrument base.
+ // 	// I wonder if there are objects I can stick in here that I can just play.
+ // 	// let manifest =  readInstrumentManifest(soundURL); // NOT SURE WHY THIS IS HERE
+ // 	soundBoxes = [];
+ // }
+
+
+ function layoutSoundBoxes()
+ {
+   soundBoxes=[];
+ 	// should get this from the video ... or canvas
+ 	let m_w=640;
+ 	let m_h=480;
+ 	// this will come from a click "near" the corner; color select may be shift click.
+ 	let l_t = m_h*0.25;
+ 	let l_b = m_h*0.75;
+ 	let l_l=m_w*0.10;
+ 	let l_r=m_w*0.90;
+
+ 	let margin = 4.0;
+ 	let s_N =sounds.length;
+ 	// bmb....bmb.
+ 	let boxW = (l_r-l_l)/s_N;
+ 	let boxH = l_b-l_t;
+ 	var theX = l_l;
+ 	var theY = l_t;
+ 	// this will be # of sounds, properly ordered etc.
+ 	// buildOrder(orderspecs,s_N); <<<
+ 	// this should run off the order array then.
+ 	for(let i=0;i<s_N;i++)
+ 	{
+ 		let s_b = new SoundBox(theX,theX+boxW-margin,theY,theY+boxH,sounds[i]);
+ 		soundBoxes.push(s_b);
+ 		// margin has to do with the box width
+ 		theX=theX+boxW;
+ 	}
+// now safe to render them.
+ }
+
+ function playIfBoxHit(lastX,lastY,newX,newY)
+ {
+ 	for(let i=0;i<soundBoxes.length;i++)
+ 	{
+ 		let s_b = soundBoxes[i];
+ 		// will use intersection of line segment and rectangle
+ 		// right now ignores the last.
+ 		 if((newX>=s_b.l) && (newX<=s_b.r) &&(newY>=s_b.t) &&(newY<=s_b.b))
+ 		 {
+ 		 	if(lastBoxPlayed != i)
+ 		 	{
+ 		 	s_b.sound.play();
+ 		 	lastBoxPlayed = i;
+ 		 	// done - fuure.. keep going (intersections)
+ 		 	break;
+ 		 	}
+ 		 }
+ 	}
+ }
+
+  </script>
+</head>
+<body onload="javascript:loadActions(this);">
+
+<div>
+<div id="instructions">
+<h1 style="textalign:center;">This is the Adaptive Use Musical Instrument Webapp: AUMI/Web</h1>
+<br />
+AUMI/Web is using HTM5 and Javascript audio and video processing to start to have some
+of the same features that the iOS and Desktop versions have. <br />
+<b>It's simpler, but also more adaptable, because of the platform it runs on.</b>
+<br/>
+This version is using the same color tracker, roughly, as iOS.
+To simplify it, instead of finding the largest contiguous area of the selected colors,
+it just chooses all of them and hopes you are using a single, very color-contrasty object to track. <br />
+<br />
+<h3>How to do it:</h3>
+<ul>
+<li> Choose a video source from the drop down. The browser will  probably ask for permission to use the video cameras. Assent to its use. </li>
+<li>To choose colors to track, click and drag over the target area on the video screen. While gathering colors, "Gathering colors" will appear on screen in the status area. When you are done, a code will appear in the status area describing the colorset.</li>
+<li>Choose an instrument - by deffault, it' the toy piano. When the cursor passes into a yellow box, it plays a note!</li>
+<li>The switches on top help to visualise what's going on.
+<ul>
+<li><b>Mirror:</b> Flips the video image. On by default.</li>
+<li><b>Rotate:</b> rotates the video image, to correctly orient the camera. External cameras may be sideways or upside down!</li>
+<li><s><b>Letterbox or Fill:</b> either fills the image in the canvas, clipping it, or letterboxes/curtains it.</s></li>
+<li><b>Show Color As Contrast:</b> This helps visualize the current tracked color set.</li>
+<li><b>Show RGB4 Colors:</b> This helps visualize truncated color space I use for tracking colors.</li>
+</ul>
+</li>
+</ul>
+It seems to be OK in Safari and Chrome. It doesn't seem to work on my iPhone, but on the iPad (gen 5), it's good - you need to double tap on the screen to set the colors though.
+</div>
+
+   <!-- Install button, hidden by default -->
+    <div id="installContainer" class="hidden">
+      <button id="butInstall" type="button">
+        Install AUMI as Web App
+      </button>
+    </div>
+
+<table>
+
+<tr>
+<td>Choose Video Device:</td>
+<td><select id='videoSelect'></select></td>
+
+<td>Mirror</td>
+<td><label class="switch">
+<input id="mirror_check" type="checkbox" onChange="toggleMirror(this);">
+  <span class="slider round"></span>
+</label></td>
+
+<td>Rotate</td>
+<td><label class="switch">
+<select id="rotation"  onChange="changeRotation(this);">
+<option selected value="0">No turns</option>
+<option value="90">CW</option>
+<option value="180">Upside down</option>
+<option value="270">CCW</option>
+</select>
+</label></td>
+</tr>
+<tr>
+<td>Choose an instrument:  <select id='instrumentSelect'></select></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td>Show ColorSet as contrast</td>
+<td><label class="switch">
+<input type="checkbox" onChange="toggleShowColorSet(this);">
+  <span class="slider round"></span>
+</label></td>
+
+<td>Show RGB4 Colors</td>
+<td><label class="switch">
+<input type="checkbox" onChange="toggleRgb4Colors(this);">
+  <span class="slider round"></span>
+</label></td>
+</tr>
+</table>
+
+<table>
+<tr><td>Status:</td><td colspan="3" id="aumiStatus"></td><td colspan="3" id="audioStatus"></td></tr>
+</table>
+
+<div class="centerdiv">
+<div id="canvasesdiv" style="position:relative; width:640px; height:480px">
+<canvas id="canvas" class="canvaslayer" style="z-index: 1;position:absolute;left:0px;top:0px;" width="640" height="480">
+This text is displayed if your browser does not support HTML5 Canvas.
+</canvas>
+ <canvas id="layer1" class="canvaslayer" style="z-index: 10;position:absolute;left:0px;top:0px;" width="640" height="480">
+This text is displayed if your browser does not support HTML5 Canvas.
+</canvas>
+</div>
+</div>
+
+<video id="video" width="0" height="0" autoplay></video>
+<img id="cursor" src="Images/radio-t@2x.png" style="display:none">
+</div>
+
+<script>
+// might need to still be in onload
+	setupInstallButton();
+</script>
+</body>
+</html>
