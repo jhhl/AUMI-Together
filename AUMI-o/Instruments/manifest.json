@@ -1,0 +1,9 @@
+// manifet.json
+// manifest file for instruments.
+// rather than scanning the directory, this will help put instruments in categories and filter out miscellaneous files
+// this may be automatically created by a script and then hand edited.
+//
+aumiinst_manifest = [
+"Toy Piano",
+"Kitchen"
+]
