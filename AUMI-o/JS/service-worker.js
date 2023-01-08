@@ -3,6 +3,7 @@ console.log("AUMI service worker is loaded");
 // various events to listen for
 const CACHE_NAME = 'offline';
 const OFFLINE_URL = 'offline.html';
+// this should be built programtically
 const FROOT = '/AUMI-o';
 const FILES_TO_CACHE = [
         FROOT+'/Instruments/Toy Piano/48.mp3',
@@ -30,10 +31,11 @@ const FILES_TO_CACHE = [
         FROOT+'/Instruments/Toy Piano/70.mp3',
         FROOT+'/Instruments/Toy Piano/71.mp3',
         FROOT+'/Instruments/Toy Piano/72.mp3',
-        
+
         FROOT+'/JS/JZZ.js',
         FROOT+'/JS/howler.js',
         FROOT+'/JS/webapp-helpers.js',
+        FROOT+'/JS/at-utils.js',
 		FROOT+'/README.md',
 		FROOT+'/index.html',
 		FROOT+'/offline.html',
@@ -41,8 +43,8 @@ const FILES_TO_CACHE = [
 		FROOT+'/switch.css',
 		FROOT+'/aumiwebapp.css'
       ];
- 
- 
+
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open('v1').then((cache) => {
@@ -60,7 +62,7 @@ self.addEventListener('fetch', function (event) {
     event.respondWith(
     caches.match(event.request)
   );
-  
+
 });
 
 
@@ -68,14 +70,14 @@ self.addEventListener('fetch', function (event) {
 /*
 self.addEventListener('install', function(event) {
   console.log('[ServiceWorker] Install');
-  
+
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     // Setting {cache: 'reload'} in the new request will ensure that the response
     // isn't fulfilled from the HTTP cache; i.e., it will be from the network.
     await cache.add(new Request(OFFLINE_URL, {cache: 'reload'}));
   })());
-  
+
   self.skipWaiting();
 });
 */
@@ -117,4 +119,3 @@ self.addEventListener('fetch', function(event) {
   }
 });
 */
-
