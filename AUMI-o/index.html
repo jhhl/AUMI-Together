@@ -122,23 +122,23 @@ navigator.mediaDevices.ondevicechange = (event) => {
 };
 
 // Elements for processing video
-var canvas = $('canvas');
-var context = canvas.getContext('2d');
-var layer1 = $('layer1');
-var contextl = layer1.getContext('2d');
+var imageLayer = $('imageLayer');
+var contextImage = imageLayer.getContext('2d');
+var annoLayer = $('annoLayer');
+var contextAnno = annoLayer.getContext('2d');
 
 var video = $('video');
 
 clearCanvas();
 
 // for color selection
-  canvas.addEventListener('mousedown', startColorCollect );
-  canvas.addEventListener('mousemove', moveColorCollect );
-  canvas.addEventListener('mouseup', endColorCollect );
+  imageLayer.addEventListener('mousedown', startColorCollect );
+  imageLayer.addEventListener('mousemove', moveColorCollect );
+  imageLayer.addEventListener('mouseup', endColorCollect );
   // this may be on top!
-  layer1.addEventListener('mousedown', startColorCollect );
-  layer1.addEventListener('mousemove', moveColorCollect );
-  layer1.addEventListener('mouseup', endColorCollect );
+  annoLayer.addEventListener('mousedown', startColorCollect );
+  annoLayer.addEventListener('mousemove', moveColorCollect );
+  annoLayer.addEventListener('mouseup', endColorCollect );
 
   // synch with t_mirror
   $('mirror_check').checked = t_mirror;
@@ -293,11 +293,11 @@ function enMirror()
 	tstyle+=transformCss(tform);
 
 	//two levels
-	let canvasCss = "z-index: 1;"+tstyle;;
-	let layer1Css = "z-index: 10;"+tstyle;
+	let imageLayerCss = "z-index: 1;"+tstyle;;
+	let annoLayerCss = "z-index: 10;"+tstyle;
 
-	canvas.style.cssText = canvasCss;
-	layer1.style.cssText = layer1Css;
+	imageLayer.style.cssText = imageLayerCss;
+	annoLayer.style.cssText = annoLayerCss;
 }
 
 function toggleMirror(elem)
@@ -312,14 +312,20 @@ function changeRotation(elem)
 	enMirror();
 }
 
+function changeZoom(elem)
+{
+  // zoom is picked up in the calculation phase?
+  // would this also mean that the video element is offscreen?
+	t_zoom = parseInt(elem.options[elem.selectedIndex].value);
+}
 function clearCanvas()
 {
 	// I guess context changes a lot.
-	let context = canvas.getContext('2d');
-	context.fillStyle = '#e8f8e0';
-	context.fillRect(0,0,canvas.width,canvas.height);
-	let contextl = layer1.getContext('2d');
-	contextl.clearRect(0,0,canvas.width,canvas.height);
+	let contextImage = imageLayer.getContext('2d');
+	contextImage.fillStyle = '#e8f8e0';
+	contextImage.fillRect(0,0,imageLayer.width,imageLayer.height);
+	let contextAnno = annoLayer.getContext('2d');
+	contextAnno.clearRect(0,0,imageLayer.width,imageLayer.height);
 }
 
 function turnVideoStreamOff()
@@ -372,20 +378,20 @@ function videoTrack() {
     }
 
      // is this permanent? can I make this global?
-    let context = canvas.getContext('2d');
+    let contextImage = imageLayer.getContext('2d');
     // a hint because we do get image data a lot.
-    context.willReadFrequently = true;
+    contextImage.willReadFrequently = true;
 
-    context.drawImage(video, 0, 0, 640, 480);
-     // we should be able to read the data out of the canvas context.
-    var frame = context.getImageData(0, 0, context.canvas.width , context.canvas.height );
+    contextImage.drawImage(video, 0, 0, 640, 480);
+     // we should be able to read the data out of the canvas contextImage.
+    var frame = contextImage.getImageData(0, 0, contextImage.canvas.width , contextImage.canvas.height );
 
-    let contextl = layer1.getContext('2d');
-    contextl.willReadFrequently = true;
+    let contextAnno = annoLayer.getContext('2d');
+    contextAnno.willReadFrequently = true;
 
-    contextl.clearRect(0,0,640,480);
+    contextAnno.clearRect(0,0,640,480);
      // we should be able to read the data out of the canvasl context.
-    var layerFrame = contextl.getImageData(0, 0, contextl.canvas.width , contextl.canvas.height );
+    var layerFrame = contextAnno.getImageData(0, 0, contextAnno.canvas.width , contextAnno.canvas.height );
 
 	// clear the Flood Array?
 	floodArray.splice(0, floodArray.length);
@@ -393,9 +399,9 @@ function videoTrack() {
 
 	drawSoundBoxes(layerFrame);
 	drawCursorBox(layerFrame);
-    context.putImageData(frame,0,0)
-    contextl.putImageData(layerFrame,0,0)
-    // this draws it into layer1 afer the bitmap is transferred.
+    contextImage.putImageData(frame,0,0)
+    contextAnno.putImageData(layerFrame,0,0)
+    // this draws it into annoLayer afer the bitmap is transferred.
     drawCursor();
 // play now that we know where the cursor is?
 playIfBoxHit(curx,cury,curx,cury); // will be last x,y later
@@ -541,14 +547,14 @@ function canvasColorIx4(elem)
 	cmapX = elem.layerX;
 	cmapY = elem.layerY;
 
-	let context = canvas.getContext('2d');
-	let frame = context.getImageData(0, 0, context.canvas.width , context.canvas.height );
+	let contextImage = imageLayer.getContext('2d');
+	let frame = contextImage.getImageData(0, 0, contextImage.canvas.width , contextImage.canvas.height );
 	var bMirror = t_mirror;
 	if(isFirefox)
 	{
 		bMirror = false;
 	}
-	let frIx =  bMirror?((cmapY*context.canvas.width) + (context.canvas.width-cmapX)):((cmapY*context.canvas.width) + cmapX);
+	let frIx =  bMirror?((cmapY*contextImage.canvas.width) + (contextImage.canvas.width-cmapX)):((cmapY*contextImage.canvas.width) + cmapX);
 
 	let r = frame.data[frIx * 4 + 0];
 	let g = frame.data[frIx * 4 + 1];
@@ -573,20 +579,20 @@ var collectingColors = false;
 // debug function
 function showCMapXY(frame)
 {
-	let context = canvas.getContext('2d');
+	let contextImage = imageLayer.getContext('2d');
 
 	// debug
-	for(let i = 0;i<context.canvas.width;i++)
+	for(let i = 0;i<contextImage.canvas.width;i++)
 	{
-			let frIx = context.canvas.width * cmapY + i;
+			let frIx = contextImage.canvas.width * cmapY + i;
 
 	 frame.data[frIx * 4 + 0] = 255;
 	 frame.data[frIx * 4 + 1] = 128;
 	 frame.data[frIx * 4 + 2] = 64;
 	}
-  	for(let i = 0;i<context.canvas.height;i++)
+  	for(let i = 0;i<contextImage.canvas.height;i++)
 	{
-			let frIx = context.canvas.width * i + cmapX;
+			let frIx = contextImage.canvas.width * i + cmapX;
 
 	 frame.data[frIx * 4 + 0] = 255;
 	 frame.data[frIx * 4 + 1] = 128;
@@ -644,9 +650,9 @@ function drawCursorBox(lFrame)
  // 128x102 is cursor radio-t@2x.png
 // 	let curx = Math.floor((BBL+BBR)/2.0);
 //	let cury = Math.floor((BBT+BBB)/2.0);
- 	let contextl = layer1.getContext('2d');
+ 	let contextAnno = annoLayer.getContext('2d');
   	var img = document.getElementById("cursor");
-  	contextl.drawImage(img,curx,cury, 64, 51);
+  	contextAnno.drawImage(img,curx,cury, 64, 51);
 }
 
 
@@ -658,10 +664,10 @@ function drawCursor()
 		// 128x102 is cursor radio-t@2x.png
 //		let curx = Math.floor((BBL+BBR)/2.0);
 //		let cury = Math.floor((BBT+BBB)/2.0);
-		let contextl = layer1.getContext('2d');
+		let contextAnno = annoLayer.getContext('2d');
 		var img = document.getElementById("cursor");
 		// half size, roughly
-		contextl.drawImage(img,curx-32,cury-25, 64, 50);
+		contextAnno.drawImage(img,curx-32,cury-25, 64, 50);
 	}
  }
 
@@ -1100,10 +1106,10 @@ It seems to be OK in Safari and Chrome. It doesn't seem to work on my iPhone, bu
 
 <div class="centerdiv">
 <div id="canvasesdiv" style="position:relative; width:640px; height:480px">
-<canvas id="canvas" class="canvaslayer" style="z-index: 1;position:absolute;left:0px;top:0px;" width="640" height="480">
+<canvas id="imageLayer" class="canvaslayer" style="z-index: 1;position:absolute;left:0px;top:0px;" width="640" height="480">
 This text is displayed if your browser does not support HTML5 Canvas.
 </canvas>
- <canvas id="layer1" class="canvaslayer" style="z-index: 10;position:absolute;left:0px;top:0px;" width="640" height="480">
+ <canvas id="annoLayer" class="canvaslayer" style="z-index: 10;position:absolute;left:0px;top:0px;" width="640" height="480">
 This text is displayed if your browser does not support HTML5 Canvas.
 </canvas>
 </div>
