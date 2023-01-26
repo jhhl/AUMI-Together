@@ -1,6 +1,8 @@
 {
 "version":"1.0",
 "name":"Toy Piano",
+"midi":
+[48,72],
 "sounds":
 [
 "48.mp3",
