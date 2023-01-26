@@ -53,9 +53,11 @@ var isMS = isMS || thisDetectedAgent.includes('Edge');
 
 // supposedly these is the video dimensions, but they are not being reported???
 // this s what we generally want.
+// device width
 var DWidth = 640;
 var DHeight = 480;
 
+//canvas width
 var CWidth = 640;
 var CHeight = 480;
 
@@ -100,7 +102,8 @@ useInstrumentN();
 setupColorTracking();
 
 // Get access to the camera!
-const constraints = { video: true, audio:false};
+ const constraints = { video: true, audio:false };
+
 if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia(constraints)) {
 	// enumerate 'em
 	navigator.mediaDevices.enumerateDevices()
@@ -169,6 +172,9 @@ function useVideoDevice(button)
     	};
     if(myPreferredCameraDeviceId == 'Off')
     {
+			CHeight =  0 ; // get the screen size to make canvas adaptive
+			CWidth =  0 ; // get the screen size to make canvas adaptive
+			reportCanvasSize(CWidth,CHeight);
     }
     else
     {
@@ -210,7 +216,20 @@ function useVideoDevice(button)
 (index):168 zoom
 */
     	// facingmode is 'user' or 'environment'!
-    	// I'd like to know if any of those other cameras show up in the video list!
+    	//  ??!!
+			// see if this works! might need to be applied once the video device is loaded, though.
+			const videoConstraints = {
+				video: {
+					deviceId: myPreferredCameraDeviceId,
+					advanced: [
+					 	{width: 1920, height: 1280},
+					 	{aspectRatio: 1.333}
+				 					],
+					height: {min: 480, ideal: 720},
+					facingmode: 'user'
+				}
+			};
+			// this works, but see if the othe one does too
     	var constraints = {
     		video: {
     		  deviceId: myPreferredCameraDeviceId,
@@ -225,8 +244,14 @@ function useVideoDevice(button)
 	        video.srcObject = stream;
 	        video.pause();
 	        // get the video metrics
-	         CHeight =  video.clientHeight , // get the screen size to make canvas adaptive
-             CWidth = video.clientWidth;
+					let videotrack = stream.getVideoTracks(0)[0];
+
+
+
+					stream.getVideoTracks()[0].getConstraints().width;
+					CHeight =  videotrack.getConstraints().height ; // get the screen size to make canvas adaptive
+					CWidth =  videotrack.getConstraints().width ; // get the screen size to make canvas adaptive
+					reportCanvasSize(CWidth,CHeight);
 	        // continuous montoring
 	 		video.addEventListener('play', videoTrack );
 	 		//start it back up
@@ -300,6 +325,23 @@ function enMirror()
 	annoLayer.style.cssText = annoLayerCss;
 }
 
+function changeCameraSize(elem)
+{
+	let cameraSizeIx = parseInt(elem.options[elem.selectedIndex].value);
+	let theStream = video.srcObject;
+	let videotrack = theStream.getVideoTracks(0)[0];
+	// ideally, we'd be able to get the physical sizes the camera returns.
+	if(cameraSizeIx==0)
+	{
+		//
+	}
+	// see if it got preset
+	CHeight =  videotrack.getConstraints().height ; // get the screen size to make canvas adaptive
+	CWidth =  videotrack.getConstraints().width ;
+
+	reportCanvasSize(CWidth,CHeight);
+	enMirror();
+}
 function toggleMirror(elem)
 {
 	t_mirror = elem.checked;
@@ -318,6 +360,14 @@ function changeZoom(elem)
   // would this also mean that the video element is offscreen?
 	t_zoom = parseInt(elem.options[elem.selectedIndex].value);
 }
+
+function reportCanvasSize(w,h)
+{
+	span_canvas_size = $("span_canvas_size");
+	span_canvas_size.innerHTML= ''.concat(w.toString(),'x',h.toString())
+
+}
+
 function clearCanvas()
 {
 	// I guess context changes a lot.
@@ -881,6 +931,8 @@ function midiNOFF(nn,vel)
   	// URLS bases for instruments.
   	// should come from the sounds module
     // that should be a manifest of sound collections and generators
+		// loaded and unloaded! that is the URL's will mostly be online, but need to be cached.
+		// which takes up space, sorry.
   	aumi_instruments=[
       ["Toy Piano","Instruments/Toy%20Piano"],
       ["Kitchen","Instruments/Kitchen"]
@@ -1050,6 +1102,14 @@ It seems to be OK in Safari and Chrome. It doesn't seem to work on my iPhone, bu
 <tr>
 <td>Choose Video Device:</td>
 <td><select id='videoSelect'></select></td>
+
+<td>Size: (physical: <span id="span_canvas_size"></span>)</td>
+<td> <label class="select">
+<select id="cameraSize"  onChange="changeCameraSize(this);">
+<option selected value="0">640x480</option>
+<option value="1">320x240</option>
+</select>
+</label></td>
 
 <td>Mirror:</td>
 <td><label class="switch">
